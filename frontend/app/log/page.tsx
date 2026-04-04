@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { useRouter } from 'next/navigation'
 import { Navigation } from '@/components/navigation'
-import api, { getAuthPassword, getAuthToken } from '@/src/lib/api'
+import api from '@/src/lib/api'
 import { encryptCyclePayload } from '@/src/lib/crypto'
+import { useAuth } from '@/context/AuthContext'
 
 const SYMPTOM_OPTIONS = [
   { id: 'flow', label: 'Flow', emoji: '💧' },
@@ -18,6 +20,8 @@ const SYMPTOM_OPTIONS = [
 ]
 
 export default function LogPage() {
+  const router = useRouter()
+  const { token, password } = useAuth()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [notes, setNotes] = useState('')
@@ -26,10 +30,10 @@ export default function LogPage() {
   const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
-    if (!getAuthToken()) {
-      window.location.href = '/login'
+    if (!token) {
+      router.replace('/login')
     }
-  }, [])
+  }, [router, token])
 
   const toggleSymptom = (symptomId: string) => {
     setSelectedSymptoms((prev) =>
@@ -42,7 +46,6 @@ export default function LogPage() {
   const handleSave = async () => {
     setSaveError('')
 
-    const password = getAuthPassword()
     if (!password) {
       setSaveError('Session expired. Please log in again.')
       return

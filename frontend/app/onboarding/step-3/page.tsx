@@ -2,12 +2,15 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { OnboardingLayout } from '@/components/onboarding-layout'
-import api, { setAuthSession } from '@/src/lib/api'
 import { clearOnboardingDraft } from '@/src/lib/onboarding-state'
+import { useAuth } from '@/context/AuthContext'
 
 export default function OnboardingStep3() {
+  const router = useRouter()
+  const { setAuthSession } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -16,6 +19,7 @@ export default function OnboardingStep3() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
   const handleComplete = async () => {
+    console.log('registering...')
     const newErrors: { [key: string]: string } = {}
 
     if (!email.trim()) {
@@ -41,14 +45,14 @@ export default function OnboardingStep3() {
 
     setLoading(true)
     try {
-      const response = await api.post('/api/auth/register', {
+      const response = await axios.post('http://localhost:8081/api/auth/register', {
         email: email.trim().toLowerCase(),
         password,
       })
 
       setAuthSession(response.data.token, password)
       clearOnboardingDraft()
-      window.location.href = '/dashboard'
+      router.replace('/dashboard')
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 400) {
         setErrors({
@@ -154,6 +158,7 @@ export default function OnboardingStep3() {
 
         {/* Complete button */}
         <button
+          type="button"
           onClick={handleComplete}
           disabled={loading}
           className="w-full mt-8 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"

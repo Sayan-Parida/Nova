@@ -2,11 +2,15 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
-import api, { setAuthSession } from '@/src/lib/api'
+import api from '@/src/lib/api'
 import { OnboardingLayout } from '@/components/onboarding-layout'
+import { useAuth } from '@/context/AuthContext'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const { setAuthSession } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -32,7 +36,7 @@ export default function LoginPage() {
         password,
       })
       setAuthSession(response.data.token, password)
-      window.location.href = '/dashboard'
+      router.replace('/dashboard')
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 400) {
         setError((err.response.data as { message?: string })?.message ?? 'Invalid input')

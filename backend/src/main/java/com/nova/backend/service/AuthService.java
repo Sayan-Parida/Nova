@@ -7,6 +7,7 @@ import com.nova.backend.exception.BadRequestException;
 import com.nova.backend.exception.UnauthorizedException;
 import com.nova.backend.repository.UserRepository;
 import com.nova.backend.security.JwtUtil;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +34,13 @@ public class AuthService {
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
 
-        User savedUser = userRepository.save(user);
+        User savedUser;
+        try {
+            savedUser = userRepository.save(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BadRequestException("Email already registered.");
+        }
+
         return jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail());
     }
 

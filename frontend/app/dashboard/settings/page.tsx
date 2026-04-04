@@ -1,16 +1,20 @@
 'use client'
 
 import Link from 'next/link'
-import { clearAuthSession } from '@/src/lib/api'
+import { useRouter } from 'next/navigation'
 import { clearOnboardingDraft } from '@/src/lib/onboarding-state'
+import { useAuth } from '@/context/AuthContext'
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const { clearAuthSession } = useAuth()
+
   const handleClearData = () => {
     if (typeof window !== 'undefined') {
       if (window.confirm('Are you sure? This will delete all your data.')) {
         clearAuthSession()
         clearOnboardingDraft()
-        window.location.href = '/login'
+        router.replace('/login')
       }
     }
   }

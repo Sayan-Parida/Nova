@@ -6,7 +6,9 @@ import axios from 'axios'
 import { CycleRing } from '@/components/cycle-ring'
 import { SymptomButton } from '@/components/symptom-button'
 import { Navigation } from '@/components/navigation'
-import api, { getAuthToken, getAuthUserId } from '@/src/lib/api'
+import api from '@/src/lib/api'
+import { useAuth } from '@/context/AuthContext'
+import { useRouter } from 'next/navigation'
 
 type CycleLogItem = {
   id: string
@@ -17,6 +19,8 @@ type CycleLogItem = {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const { token, userId } = useAuth()
   const [loadingLogs, setLoadingLogs] = useState(true)
   const [logsError, setLogsError] = useState('')
   const [cycleLogs, setCycleLogs] = useState<CycleLogItem[]>([])
@@ -28,11 +32,8 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-    const token = getAuthToken()
-    const userId = getAuthUserId()
-
-    if (!token || !userId) {
-      window.location.href = '/login'
+    if (!token) {
+      router.replace('/login')
       return
     }
 
@@ -52,7 +53,7 @@ export default function DashboardPage() {
     }
 
     loadLogs()
-  }, [])
+  }, [router, token, userId])
 
   const toggleSymptom = (symptom: string) => {
     setSymptoms((prev) => ({ ...prev, [symptom]: !prev[symptom] }))
