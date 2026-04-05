@@ -91,9 +91,9 @@ export default function OnboardingStep3() {
         </div>
 
         {/* Info box */}
-        <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/30">
+        <div className="p-4 rounded-lg bg-card border border-border">
           <p className="text-sm text-foreground">
-            <span className="font-medium">🔒 Your privacy matters:</span> Your password encrypts your data. We never store it on our servers—it stays only on your device.
+            <span className="font-medium">Privacy notice:</span> Your password encrypts your data. We never store it on our servers. Data remains on your device.
           </p>
         </div>
 

@@ -6,9 +6,9 @@ interface NavigationProps {
 
 export function Navigation({ active }: NavigationProps) {
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', key: 'dashboard' },
-    { href: '/log', label: 'Log', icon: 'log', key: 'log' },
-    { href: '/predictions', label: 'Predictions', icon: 'predictions', key: 'predictions' },
+    { href: '/dashboard', label: 'Dashboard', key: 'dashboard' },
+    { href: '/log', label: 'Log', key: 'log' },
+    { href: '/predictions', label: 'Predictions', key: 'predictions' },
   ]
 
   return (
@@ -27,11 +27,6 @@ export function Navigation({ active }: NavigationProps) {
                     : 'text-muted-foreground border-transparent hover:text-foreground'
                 }`}
               >
-                <span className="mb-1 text-xl">
-                  {item.key === 'dashboard' && '🏠'}
-                  {item.key === 'log' && '📝'}
-                  {item.key === 'predictions' && '📅'}
-                </span>
                 {item.label}
               </Link>
             )

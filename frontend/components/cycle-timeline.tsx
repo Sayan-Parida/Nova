@@ -13,29 +13,25 @@ export function CycleTimeline({
   const phases = [
     {
       name: 'Menstrual',
-      emoji: '🩸',
-      color: '#2a2a2a',
+      color: '#ffffff1a',
       start: 1,
       end: 5,
     },
     {
       name: 'Follicular',
-      emoji: '📍',
-      color: '#f5f5f5',
+      color: '#ffffff24',
       start: 6,
       end: 13,
     },
     {
       name: 'Ovulation',
-      emoji: '🌸',
-      color: '#d4949f',
+      color: '#ffffff2e',
       start: 14,
       end: 14,
     },
     {
       name: 'Luteal',
-      emoji: '🌙',
-      color: '#a89bc4',
+      color: '#ffffff16',
       start: 15,
       end: cycleLength,
     },
@@ -103,27 +99,24 @@ export function CycleTimeline({
               key={phase.name}
               className={`p-4 rounded-lg border transition-all ${
                 isCurrentPhase
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-muted/20'
+                  ? 'border-primary/70 bg-card'
+                  : 'border-border bg-card'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{phase.emoji}</span>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {phase.name}
-                        {isCurrentPhase && (
-                          <span className="ml-2 text-xs px-2 py-1 rounded-full bg-primary text-primary-foreground">
-                            Now
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Days {phase.start}–{phase.end}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {phase.name}
+                      {isCurrentPhase && (
+                        <span className="ml-2 text-xs px-2 py-1 rounded-full bg-primary text-primary-foreground">
+                          Current
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Days {phase.start}-{phase.end}
+                    </p>
                   </div>
                 </div>
               </div>

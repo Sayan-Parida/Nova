@@ -9,16 +9,6 @@ export function CycleRing({ currentDay, cycleLength }: CycleRingProps) {
   const progress = (currentDay / cycleLength) * 100
   const strokeDashoffset = circumference - (progress / 100) * circumference
 
-  // Determine phase color
-  let phaseColor = '#a89bc4' // purple for luteal
-  if (currentDay < 14) {
-    phaseColor = '#f5f5f5' // light for follicular
-  } else if (currentDay >= 12 && currentDay <= 16) {
-    phaseColor = '#d4949f' // rose for fertile
-  } else if (currentDay > 24) {
-    phaseColor = '#2a2a2a' // dark for menstrual
-  }
-
   return (
     <div className="relative inline-flex items-center justify-center">
       <svg width="240" height="240" className="transform -rotate-90">
@@ -40,7 +30,7 @@ export function CycleRing({ currentDay, cycleLength }: CycleRingProps) {
           cy="120"
           r={radius}
           fill="none"
-          stroke={phaseColor}
+          stroke="#ffffffcc"
           strokeWidth="6"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
@@ -53,8 +43,8 @@ export function CycleRing({ currentDay, cycleLength }: CycleRingProps) {
           cx="120"
           cy="120"
           r="50"
-          fill="rgba(212, 148, 159, 0.1)"
-          stroke={phaseColor}
+          fill="rgba(255, 255, 255, 0.06)"
+          stroke="#ffffff33"
           strokeWidth="1"
           opacity="0.5"
         />

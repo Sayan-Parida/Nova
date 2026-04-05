@@ -33,26 +33,9 @@ export function OnboardingLayout({
           </p>
         </div>
 
-        {/* Content */}
         <div className="space-y-6">
-          {/* Logo */}
-          <div className="flex justify-center mb-8">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/30">
-              <svg
-                className="w-6 h-6 text-primary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <circle cx="12" cy="12" r="9" strokeWidth="1.5" opacity="0.5" />
-                <circle cx="12" cy="12" r="4" strokeWidth="1.5" fill="currentColor" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Heading */}
           <div className="text-center space-y-2 mb-8">
-            <h1 className="text-3xl font-light tracking-tight text-foreground">
+            <h1 className="text-2xl font-light tracking-tight text-foreground">
               {title}
             </h1>
             <p className="text-muted-foreground text-sm">
@@ -60,7 +43,6 @@ export function OnboardingLayout({
             </p>
           </div>
 
-          {/* Form content */}
           {children}
         </div>
       </div>

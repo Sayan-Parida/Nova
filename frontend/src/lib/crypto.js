@@ -6,6 +6,15 @@ function bytesToBase64(bytes) {
   return btoa(binary)
 }
 
+function base64ToBytes(base64) {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
 async function deriveAesKey(password, salt) {
   const encoder = new TextEncoder()
   const passwordKey = await crypto.subtle.importKey(
@@ -29,7 +38,7 @@ async function deriveAesKey(password, salt) {
       length: 256,
     },
     false,
-    ['encrypt'],
+    ['encrypt', 'decrypt'],
   )
 }
 
@@ -56,4 +65,33 @@ export async function encryptCyclePayload(payload, password) {
   output.set(encryptedBytes, salt.length + iv.length)
 
   return bytesToBase64(output)
+}
+
+export async function decryptCyclePayload(encryptedData, password) {
+  const decoder = new TextDecoder()
+  const dataBytes = base64ToBytes(encryptedData)
+
+  const saltLength = 16
+  const ivLength = 12
+
+  if (dataBytes.length <= saltLength + ivLength) {
+    throw new Error('Encrypted payload is invalid')
+  }
+
+  const salt = dataBytes.slice(0, saltLength)
+  const iv = dataBytes.slice(saltLength, saltLength + ivLength)
+  const cipherText = dataBytes.slice(saltLength + ivLength)
+
+  const key = await deriveAesKey(password, salt)
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+    },
+    key,
+    cipherText,
+  )
+
+  const decryptedText = decoder.decode(decryptedBuffer)
+  return JSON.parse(decryptedText)
 }
