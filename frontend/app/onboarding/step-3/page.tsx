@@ -45,9 +45,14 @@ export default function OnboardingStep3() {
 
     setLoading(true)
     try {
+      const timezone = typeof Intl !== 'undefined'
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : null
+
       const response = await axios.post('http://localhost:8081/api/auth/register', {
         email: email.trim().toLowerCase(),
         password,
+        timezone,
       })
 
       setAuthSession(response.data.token, password)

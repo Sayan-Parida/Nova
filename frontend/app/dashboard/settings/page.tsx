@@ -28,6 +28,8 @@ type CyclePayload = {
   selectedDate?: string
   timestamp?: string
   flowIntensity?: string
+  discomfort?: number
+  energyLevel?: number
   symptoms?: string[]
   moods?: string[]
   painSeverity?: {
@@ -122,6 +124,7 @@ export default function SettingsPage() {
   const [loadingReminder, setLoadingReminder] = useState(true)
   const [savingReminder, setSavingReminder] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [recentHistory, setRecentHistory] = useState<Array<{ date: string; flow: string; discomfort: string }>>([])
   const reminderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reminderIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -197,6 +200,36 @@ export default function SettingsPage() {
 
         const response = await api.get(`/api/cycles/${userId}`)
         const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
+
+        const historyRows = await Promise.all(
+          logs
+            .filter((log) => log.dataType === 'CYCLE')
+            .slice(0, 20)
+            .map(async (log) => {
+              try {
+                const payload = await decryptCyclePayload(log.encryptedData, password) as CyclePayload
+                const parsedDate =
+                  parseCycleDate(payload.selectedDate)
+                  ?? parseCycleDate(payload.timestamp)
+                  ?? parseCycleDate(log.timestamp)
+
+                if (!parsedDate) {
+                  return null
+                }
+
+                return {
+                  date: parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                  flow: payload.flowIntensity ?? '-',
+                  discomfort: String(payload.discomfort ?? payload.painSeverity?.cramps ?? '-'),
+                }
+              } catch {
+                return null
+              }
+            }),
+        )
+
+        setRecentHistory(historyRows.filter((row): row is { date: string; flow: string; discomfort: string } => row !== null).slice(0, 8))
+
         const latestProfileLog = logs
           .filter((log) => log.dataType === 'PROFILE')
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
@@ -527,7 +560,7 @@ export default function SettingsPage() {
           <h2 className="text-base font-light text-foreground">Your data</h2>
           <div className="p-4 rounded-lg border border-border bg-card space-y-3">
             <p className="text-xs text-muted-foreground">
-              Export your encrypted cycle history to a local PDF summary.
+              Export your cycle history to a local PDF summary.
             </p>
             <button
               type="button"
@@ -537,6 +570,23 @@ export default function SettingsPage() {
             >
               {exportingPdf ? 'Exporting PDF...' : 'Export my data'}
             </button>
+          </div>
+
+          <div className="p-4 rounded-lg border border-border bg-card space-y-3">
+            <p className="text-sm font-medium text-foreground">Recent history</p>
+            {recentHistory.length === 0 && (
+              <p className="text-xs text-muted-foreground">No cycle entries yet.</p>
+            )}
+            {recentHistory.length > 0 && (
+              <div className="space-y-2">
+                {recentHistory.map((row) => (
+                  <div key={`${row.date}-${row.flow}-${row.discomfort}`} className="flex items-center justify-between text-xs">
+                    <span className="text-foreground">{row.date}</span>
+                    <span className="text-muted-foreground">Flow {row.flow} • Discomfort {row.discomfort}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

@@ -8,17 +8,18 @@ import { Navigation } from '@/components/navigation'
 import api from '@/src/lib/api'
 import { encryptCyclePayload } from '@/src/lib/crypto'
 import { useAuth } from '@/context/AuthContext'
-
-type PainType = 'cramps' | 'headache' | 'backPain' | 'bloating'
+import {
+  calculateCycleDay,
+  dateKey,
+  detectLogAnomaly,
+  derivePeriodStarts,
+  getAverageCycleLength,
+  getCycleDayForDate,
+  parseDateInput,
+  uniqueSortedDates,
+} from '@/src/lib/cycle-intelligence'
 
 const FLOW_INTENSITY_OPTIONS = ['None', 'Spotting', 'Light', 'Medium', 'Heavy']
-
-const PAIN_TRACKERS: Array<{ id: PainType; label: string }> = [
-  { id: 'cramps', label: 'Cramps' },
-  { id: 'headache', label: 'Headache' },
-  { id: 'backPain', label: 'Back pain' },
-  { id: 'bloating', label: 'Bloating' },
-]
 
 const MOOD_OPTIONS = [
   { id: 'happy', label: 'Happy' },
@@ -29,20 +30,42 @@ const MOOD_OPTIONS = [
   { id: 'energetic', label: 'Energetic' },
 ]
 
+type CycleLogItem = {
+  id: string
+  userId: string
+  encryptedData: string
+  timestamp: string
+  dataType: 'CYCLE' | 'SYMPTOM' | 'NOTE' | 'PROFILE'
+}
+
+type CyclePayload = {
+  selectedDate?: string
+  timestamp?: string
+  flowIntensity?: string
+  discomfort?: number
+  moods?: string[]
+  energyLevel?: number
+  notes?: string
+  painSeverity?: {
+    cramps?: number
+    headache?: number
+    backPain?: number
+    bloating?: number
+  }
+  sleepQuality?: number
+}
+
 export default function LogPage() {
   const router = useRouter()
-  const { token, password } = useAuth()
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const { token, password, userId } = useAuth()
+  const selectedDate = dateKey(new Date())
   const [flowIntensity, setFlowIntensity] = useState('None')
-  const [painSeverity, setPainSeverity] = useState<Record<PainType, number>>({
-    cramps: 1,
-    headache: 1,
-    backPain: 1,
-    bloating: 1,
-  })
+  const [discomfort, setDiscomfort] = useState(1)
   const [selectedMoods, setSelectedMoods] = useState<string[]>([])
-  const [sleepQuality, setSleepQuality] = useState(7)
+  const [energyLevel, setEnergyLevel] = useState(7)
   const [notes, setNotes] = useState('')
+  const [existingLogId, setExistingLogId] = useState<string | null>(null)
+  const [loadingExisting, setLoadingExisting] = useState(true)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -53,6 +76,73 @@ export default function LogPage() {
     }
   }, [router, token])
 
+  useEffect(() => {
+    const loadTodayLog = async () => {
+      setLoadingExisting(true)
+
+      if (!token || !userId || !password) {
+        setLoadingExisting(false)
+        return
+      }
+
+      try {
+        const response = await api.get(`/api/cycles/${userId}`)
+        const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
+        const { decryptCyclePayload } = await import('@/src/lib/crypto')
+
+        const rows = await Promise.all(
+          logs
+            .filter((log) => log.dataType === 'CYCLE')
+            .map(async (log) => {
+              try {
+                const payload = await decryptCyclePayload(log.encryptedData, password) as CyclePayload
+                const parsedDate =
+                  parseDateInput(payload.selectedDate)
+                  ?? parseDateInput(payload.timestamp)
+                  ?? parseDateInput(log.timestamp)
+
+                if (!parsedDate) {
+                  return null
+                }
+
+                return {
+                  id: log.id,
+                  timestamp: log.timestamp,
+                  payload,
+                  dateValue: dateKey(parsedDate),
+                }
+              } catch {
+                return null
+              }
+            }),
+        )
+
+        const todayRow = rows
+          .filter((row): row is { id: string; timestamp: string; payload: CyclePayload; dateValue: string } => row !== null)
+          .filter((row) => row.dateValue === selectedDate)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+
+        if (!todayRow) {
+          setExistingLogId(null)
+          return
+        }
+
+        setExistingLogId(todayRow.id)
+        setFlowIntensity(todayRow.payload.flowIntensity ?? 'None')
+        setDiscomfort(todayRow.payload.discomfort ?? todayRow.payload.painSeverity?.cramps ?? 1)
+        setSelectedMoods(Array.isArray(todayRow.payload.moods) ? todayRow.payload.moods : [])
+        setEnergyLevel(todayRow.payload.energyLevel ?? todayRow.payload.sleepQuality ?? 7)
+        setNotes(todayRow.payload.notes ?? '')
+      } catch {
+        setExistingLogId(null)
+      } finally {
+        setLoadingExisting(false)
+      }
+    }
+
+    loadTodayLog()
+  }, [password, selectedDate, token, userId])
+
   const toggleMood = (moodId: string) => {
     setSelectedMoods((prev) =>
       prev.includes(moodId)
@@ -61,28 +151,100 @@ export default function LogPage() {
     )
   }
 
-  const setPainValue = (painType: PainType, value: number) => {
-    setPainSeverity((prev) => ({
-      ...prev,
-      [painType]: value,
-    }))
-  }
-
   const selectedMoodLabels = MOOD_OPTIONS
     .filter((mood) => selectedMoods.includes(mood.id))
     .map((mood) => mood.label)
 
-  const averagePain = (
-    Object.values(painSeverity).reduce((sum, value) => sum + value, 0)
-    / Object.values(painSeverity).length
-  ).toFixed(1)
-
   const quickSummary = [
     `Flow: ${flowIntensity}`,
     selectedMoodLabels.length > 0 ? `Mood: ${selectedMoodLabels.join(', ')}` : 'Mood: None selected',
-    `Sleep: ${sleepQuality}/10`,
-    `Avg pain: ${averagePain}/5`,
+    `Discomfort: ${discomfort}/5`,
+    `Energy: ${energyLevel}/10`,
   ].join(' • ')
+
+  const maybeShowAnomalyToast = async (todayPayload: CyclePayload) => {
+    if (!password || !userId) {
+      return
+    }
+
+    const todayDate = parseDateInput(todayPayload.selectedDate) ?? new Date()
+
+    try {
+      const response = await api.get(`/api/cycles/${userId}`)
+      const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
+      const { decryptCyclePayload } = await import('@/src/lib/crypto')
+
+      const decryptedRows = await Promise.all(
+        logs
+          .filter((log) => log.dataType === 'CYCLE')
+          .map(async (log) => {
+            try {
+              const payload = await decryptCyclePayload(log.encryptedData, password) as CyclePayload
+              const parsedDate =
+                parseDateInput(payload.selectedDate)
+                ?? parseDateInput(payload.timestamp)
+                ?? parseDateInput(log.timestamp)
+
+              if (!parsedDate) {
+                return null
+              }
+
+              return { payload, date: parsedDate }
+            } catch {
+              return null
+            }
+          }),
+      )
+
+      const entries = decryptedRows.filter((row): row is { payload: CyclePayload; date: Date } => row !== null)
+      const periodSignalDates = entries
+        .filter((entry) => {
+          const flow = entry.payload.flowIntensity?.toLowerCase()
+          return flow === 'spotting' || flow === 'light' || flow === 'medium' || flow === 'heavy'
+        })
+        .map((entry) => entry.date)
+
+      const periodStarts = derivePeriodStarts(uniqueSortedDates(periodSignalDates.length > 0 ? periodSignalDates : entries.map((entry) => entry.date)))
+      const averageCycleLength = getAverageCycleLength(periodStarts)
+      const cycleDay = periodStarts.length > 0
+        ? getCycleDayForDate(todayDate, periodStarts, averageCycleLength)
+        : calculateCycleDay(todayDate)
+
+      if (!cycleDay) {
+        return
+      }
+
+      const historicalLogs = entries
+        .filter((entry) => dateKey(entry.date) !== dateKey(todayDate))
+        .map((entry) => ({
+          date: entry.date,
+          cycleDay: getCycleDayForDate(entry.date, periodStarts, averageCycleLength) ?? undefined,
+          discomfort: entry.payload.discomfort
+            ?? entry.payload.painSeverity?.cramps
+            ?? undefined,
+          energyLevel: entry.payload.energyLevel
+            ?? entry.payload.sleepQuality
+            ?? undefined,
+        }))
+
+      const message = detectLogAnomaly(
+        {
+          date: todayDate,
+          cycleDay,
+          discomfort: todayPayload.discomfort,
+          energyLevel: todayPayload.energyLevel,
+        },
+        historicalLogs,
+        cycleDay,
+      )
+
+      if (message) {
+        toast.info(message, { duration: 4000 })
+      }
+    } catch {
+      // Silent fallback for privacy-first UX; no user data leaves the client here.
+    }
+  }
 
   const handleSave = async () => {
     setSaveError('')
@@ -92,29 +254,48 @@ export default function LogPage() {
       return
     }
 
+    if (loadingExisting) {
+      setSaveError('Preparing today\'s log. Please try again.')
+      return
+    }
+
     setSaving(true)
     try {
+      const payload: CyclePayload = {
+        selectedDate,
+        flowIntensity,
+        discomfort,
+        moods: selectedMoods,
+        energyLevel,
+        quickSummary,
+        notes,
+        timestamp: new Date().toISOString(),
+      }
+
       const encryptedData = await encryptCyclePayload(
-        {
-          selectedDate,
-          flowIntensity,
-          painSeverity,
-          moods: selectedMoods,
-          sleepQuality,
-          quickSummary,
-          notes,
-          timestamp: new Date().toISOString(),
-        },
+        payload,
         password,
       )
 
-      await api.post('/api/cycles', {
+      const requestBody = {
         encryptedData,
         dataType: 'CYCLE',
-      })
+        logDate: selectedDate,
+      }
+
+      if (existingLogId) {
+        await api.put(`/api/cycles/${existingLogId}`, requestBody)
+      } else {
+        const response = await api.post('/api/cycles', requestBody)
+        if (response?.data?.id) {
+          setExistingLogId(response.data.id as string)
+        }
+      }
+
+      await maybeShowAnomalyToast(payload)
 
       setSaved(true)
-      toast.success('Entry saved securely')
+      toast.success('Entry saved')
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 400) {
@@ -138,17 +319,15 @@ export default function LogPage() {
 
       {/* Main content */}
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-        {/* Date picker */}
+        {/* Date */}
         <section className="space-y-4">
           <label className="block text-sm font-medium text-foreground">
             Date
           </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg bg-card border border-border text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-colors"
-          />
+          <div className="w-full px-4 py-2 rounded-lg bg-card border border-border text-foreground">
+            {selectedDate}
+          </div>
+          <p className="text-xs text-muted-foreground">Logging is limited to today.</p>
         </section>
 
         {/* Flow intensity */}
@@ -176,32 +355,28 @@ export default function LogPage() {
           </div>
         </section>
 
-        {/* Pain tracker */}
+        {/* Discomfort */}
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-light text-foreground">Pain tracker</h2>
+            <h2 className="text-base font-light text-foreground">Discomfort</h2>
             <p className="text-xs text-muted-foreground">1 = low, 5 = high</p>
           </div>
 
-          <div className="space-y-4">
-            {PAIN_TRACKERS.map((pain) => (
-              <div key={pain.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">{pain.label}</p>
-                  <span className="text-sm text-primary font-medium">{painSeverity[pain.id]}</span>
-                </div>
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">Discomfort level</p>
+              <span className="text-sm text-primary font-medium">{discomfort}</span>
+            </div>
 
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  step={1}
-                  value={painSeverity[pain.id]}
-                  onChange={(e) => setPainValue(pain.id, Number(e.target.value))}
-                  className="w-full accent-primary"
-                />
-              </div>
-            ))}
+            <input
+              type="range"
+              min={1}
+              max={5}
+              step={1}
+              value={discomfort}
+              onChange={(e) => setDiscomfort(Number(e.target.value))}
+              className="w-full accent-primary"
+            />
           </div>
         </section>
 
@@ -230,11 +405,11 @@ export default function LogPage() {
           </div>
         </section>
 
-        {/* Sleep quality */}
+        {/* Energy level */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-light text-foreground">Sleep quality</h2>
-            <span className="text-sm text-primary font-medium">{sleepQuality}/10</span>
+            <h2 className="text-lg font-light text-foreground">Energy level</h2>
+            <span className="text-sm text-primary font-medium">{energyLevel}/10</span>
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
@@ -243,13 +418,13 @@ export default function LogPage() {
               min={1}
               max={10}
               step={1}
-              value={sleepQuality}
-              onChange={(e) => setSleepQuality(Number(e.target.value))}
+              value={energyLevel}
+              onChange={(e) => setEnergyLevel(Number(e.target.value))}
               className="w-full accent-primary"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Poor</span>
-              <span>Great</span>
+              <span>Low</span>
+              <span>High</span>
             </div>
           </div>
         </section>
@@ -271,14 +446,14 @@ export default function LogPage() {
         {/* Save button */}
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || loadingExisting}
           className={`w-full px-4 py-3 rounded-lg font-medium transition-all ${
             saved
               ? 'bg-card border border-border text-foreground'
               : 'bg-primary text-primary-foreground hover:bg-primary/90'
           } disabled:opacity-60`}
         >
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save entry'}
+          {saving ? 'Saving...' : saved ? 'Saved' : existingLogId ? 'Update today\'s entry' : 'Save today\'s entry'}
         </button>
         {saveError && (
           <p className="text-sm text-destructive">{saveError}</p>

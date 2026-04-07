@@ -3,6 +3,15 @@
 import axios from 'axios'
 import { clearAuthSession, getAuthToken } from '@/context/AuthContext'
 
+function getTimezoneOffsetHeaderValue() {
+  const offsetMinutes = -new Date().getTimezoneOffset()
+  const sign = offsetMinutes >= 0 ? '+' : '-'
+  const absoluteMinutes = Math.abs(offsetMinutes)
+  const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, '0')
+  const minutes = String(absoluteMinutes % 60).padStart(2, '0')
+  return `${sign}${hours}:${minutes}`
+}
+
 const api = axios.create({
   baseURL: 'http://localhost:8081',
 })
@@ -14,6 +23,10 @@ api.interceptors.request.use(
       config.headers = config.headers ?? {}
       config.headers.Authorization = `Bearer ${authToken}`
     }
+
+    config.headers = config.headers ?? {}
+    config.headers['X-Timezone-Offset'] = getTimezoneOffsetHeaderValue()
+
     return config
   },
   (error) => Promise.reject(error),

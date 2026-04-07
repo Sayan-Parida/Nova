@@ -14,6 +14,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -38,6 +39,9 @@ public class CycleLog {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private DataType dataType;
+
+    @Column(name = "log_date")
+    private LocalDate logDate;
 
     @PrePersist
     void onCreate() {
@@ -74,5 +78,13 @@ public class CycleLog {
 
     public void setDataType(DataType dataType) {
         this.dataType = dataType;
+    }
+
+    public LocalDate getLogDate() {
+        return logDate;
+    }
+
+    public void setLogDate(LocalDate logDate) {
+        this.logDate = logDate;
     }
 }

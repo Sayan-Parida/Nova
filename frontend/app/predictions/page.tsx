@@ -8,6 +8,20 @@ import api from '@/src/lib/api'
 import { decryptCyclePayload } from '@/src/lib/crypto'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+import {
+  addDays,
+  calculateFertileWindow,
+  calculateLutealLength,
+  calculateVariabilityScore,
+  derivePeriodStarts,
+  getAverageCycleLength,
+  getCycleDayForDate,
+  getCycleLengths,
+  isLatePeriod,
+  parseDateInput,
+  startOfDay,
+  uniqueSortedDates,
+} from '@/src/lib/cycle-intelligence'
 
 type CycleLogItem = {
   id: string
@@ -20,7 +34,7 @@ type CycleLogItem = {
 type DecryptedCyclePayload = {
   selectedDate?: string
   timestamp?: string
-  symptoms?: string[]
+  flowIntensity?: string
 }
 
 type PredictionStats = {
@@ -28,127 +42,27 @@ type PredictionStats = {
   currentDay: number
   lastPeriodDate: Date
   nextPeriodDate: Date
-  fertileStartDate: Date
-  fertileEndDate: Date
   ovulationDate: Date
-  confidenceDays: number
+  fertileBands: { low: [number, number]; medium: [number, number]; peak: number }
+  avgLutealLength: number | null
   daysUntilNextPeriod: number
+  variabilityLabel: string
+  latePeriod: ReturnType<typeof isLatePeriod>
 }
 
-const DEFAULT_CYCLE_LENGTH = 28
-const FALLBACK_CONFIDENCE_DAYS = 2
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function parseDateInput(value: string | undefined | null) {
-  if (!value) {
-    return null
-  }
-
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? `${value}T00:00:00`
-    : value
-  const parsed = new Date(normalized)
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null
-  }
-
-  return startOfDay(parsed)
-}
-
-function dayDiff(from: Date, to: Date) {
-  const millisecondsPerDay = 1000 * 60 * 60 * 24
-  return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / millisecondsPerDay)
-}
-
-function uniqueDates(dates: Date[]) {
-  const map = new Map<string, Date>()
-  for (const date of dates) {
-    const key = date.toISOString().slice(0, 10)
-    if (!map.has(key)) {
-      map.set(key, date)
-    }
-  }
-  return [...map.values()].sort((a, b) => a.getTime() - b.getTime())
-}
-
-function derivePeriodStarts(sortedDates: Date[]) {
-  if (sortedDates.length === 0) {
-    return []
-  }
-
-  const starts = [sortedDates[0]]
-  for (let i = 1; i < sortedDates.length; i += 1) {
-    const prev = sortedDates[i - 1]
-    const current = sortedDates[i]
-    if (dayDiff(prev, current) >= 10) {
-      starts.push(current)
-    }
-  }
-
-  return starts
-}
-
-function computeConfidenceDays(cycleLengths: number[]) {
-  if (cycleLengths.length < 2) {
-    return FALLBACK_CONFIDENCE_DAYS
-  }
-
-  const mean = cycleLengths.reduce((sum, value) => sum + value, 0) / cycleLengths.length
-  const variance =
-    cycleLengths.reduce((sum, value) => sum + (value - mean) ** 2, 0) / cycleLengths.length
-  const stdDev = Math.sqrt(variance)
-
-  return Math.max(1, Math.min(7, Math.round(stdDev)))
-}
-
-function buildPredictionStats(periodStarts: Date[]) {
-  const validCycleLengths: number[] = []
-  for (let i = 1; i < periodStarts.length; i += 1) {
-    const length = dayDiff(periodStarts[i - 1], periodStarts[i])
-    if (length >= 20 && length <= 60) {
-      validCycleLengths.push(length)
-    }
-  }
-
-  const averageCycleLength = validCycleLengths.length > 0
-    ? Math.round(validCycleLengths.reduce((sum, value) => sum + value, 0) / validCycleLengths.length)
-    : DEFAULT_CYCLE_LENGTH
-
-  const lastPeriodDate = periodStarts.length > 0
-    ? periodStarts[periodStarts.length - 1]
-    : startOfDay(new Date())
-
-  const elapsed = dayDiff(lastPeriodDate, new Date())
-  const normalizedElapsed = ((elapsed % averageCycleLength) + averageCycleLength) % averageCycleLength
-  const currentDay = normalizedElapsed + 1
-  const daysUntilNextPeriod = averageCycleLength - currentDay
-
-  const nextPeriodDate = new Date(lastPeriodDate)
-  nextPeriodDate.setDate(nextPeriodDate.getDate() + averageCycleLength)
-
-  const ovulationDate = new Date(nextPeriodDate)
-  ovulationDate.setDate(ovulationDate.getDate() - 14)
-
-  const fertileStartDate = new Date(ovulationDate)
-  fertileStartDate.setDate(fertileStartDate.getDate() - 2)
-
-  const fertileEndDate = new Date(ovulationDate)
-  fertileEndDate.setDate(fertileEndDate.getDate() + 2)
-
+function buildFallbackStats(): PredictionStats {
+  const today = startOfDay(new Date())
   return {
-    cycleLength: averageCycleLength,
-    currentDay,
-    lastPeriodDate,
-    nextPeriodDate,
-    fertileStartDate,
-    fertileEndDate,
-    ovulationDate,
-    confidenceDays: computeConfidenceDays(validCycleLengths),
-    daysUntilNextPeriod,
+    cycleLength: 28,
+    currentDay: 1,
+    lastPeriodDate: today,
+    nextPeriodDate: addDays(today, 28),
+    ovulationDate: addDays(today, 13),
+    fertileBands: calculateFertileWindow(28, 14),
+    avgLutealLength: null,
+    daysUntilNextPeriod: 28,
+    variabilityLabel: 'Log more cycles to estimate regularity',
+    latePeriod: null,
   }
 }
 
@@ -157,7 +71,7 @@ export default function PredictionsPage() {
   const { token, userId, password } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [stats, setStats] = useState<PredictionStats>(() => buildPredictionStats([]))
+  const [stats, setStats] = useState<PredictionStats>(() => buildFallbackStats())
 
   useEffect(() => {
     if (!token) {
@@ -179,37 +93,93 @@ export default function PredictionsPage() {
         const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
 
         const decryptedRows = await Promise.all(
-          logs.map(async (log) => {
-            try {
-              const decrypted = await decryptCyclePayload(log.encryptedData, password) as DecryptedCyclePayload
-              const parsedDate =
-                parseDateInput(decrypted.selectedDate)
-                ?? parseDateInput(decrypted.timestamp)
-                ?? parseDateInput(log.timestamp)
+          logs
+            .filter((log) => log.dataType === 'CYCLE')
+            .map(async (log) => {
+              try {
+                const decrypted = await decryptCyclePayload(log.encryptedData, password) as DecryptedCyclePayload
+                const parsedDate =
+                  parseDateInput(decrypted.selectedDate)
+                  ?? parseDateInput(decrypted.timestamp)
+                  ?? parseDateInput(log.timestamp)
 
-              return {
-                log,
-                decrypted,
-                parsedDate,
+                if (!parsedDate) {
+                  return null
+                }
+
+                return {
+                  log,
+                  decrypted,
+                  parsedDate,
+                }
+              } catch {
+                return null
               }
-            } catch {
-              return null
-            }
-          }),
+            }),
         )
 
         const cycleRows = decryptedRows.filter(
-          (row): row is { log: CycleLogItem; decrypted: DecryptedCyclePayload; parsedDate: Date | null } =>
-            row !== null && row.log.dataType === 'CYCLE' && row.parsedDate !== null,
+          (row): row is { log: CycleLogItem; decrypted: DecryptedCyclePayload; parsedDate: Date } =>
+            row !== null,
         )
 
-        const flowRows = cycleRows.filter((row) => row.decrypted.symptoms?.includes('flow'))
-        const candidateDates = (flowRows.length > 0 ? flowRows : cycleRows)
+        const periodSignalDates = cycleRows
+          .filter((row) => {
+            const flow = row.decrypted.flowIntensity?.toLowerCase()
+            return flow === 'spotting' || flow === 'light' || flow === 'medium' || flow === 'heavy'
+          })
           .map((row) => row.parsedDate)
-          .filter((date): date is Date => date !== null)
 
-        const periodStarts = derivePeriodStarts(uniqueDates(candidateDates))
-        setStats(buildPredictionStats(periodStarts))
+        const dates = periodSignalDates.length > 0
+          ? periodSignalDates
+          : cycleRows.map((row) => row.parsedDate)
+
+        const periodStarts = derivePeriodStarts(uniqueSortedDates(dates))
+        const cycleLength = getAverageCycleLength(periodStarts)
+        const cycleLengths = getCycleLengths(periodStarts)
+        const variability = calculateVariabilityScore(cycleLengths)
+
+        const lastPeriodDate = periodStarts.length > 0
+          ? periodStarts[periodStarts.length - 1]
+          : startOfDay(new Date())
+
+        const currentDay = getCycleDayForDate(startOfDay(new Date()), periodStarts, cycleLength) ?? 1
+
+        const lutealLengths: number[] = []
+        for (let i = 1; i < periodStarts.length; i += 1) {
+          const start = periodStarts[i - 1]
+          const next = periodStarts[i]
+          const observedLength = Math.max(20, Math.min(60, Math.round((next.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))))
+          lutealLengths.push(calculateLutealLength(start, next, observedLength))
+        }
+
+        const recentLuteal = lutealLengths.slice(-3)
+        const avgLutealLength = recentLuteal.length > 0
+          ? Math.round(recentLuteal.reduce((sum, value) => sum + value, 0) / recentLuteal.length)
+          : null
+
+        const fertileBands = calculateFertileWindow(cycleLength, avgLutealLength ?? 14)
+        const ovulationDate = addDays(lastPeriodDate, fertileBands.peak - 1)
+
+        const nextPeriodDate = avgLutealLength
+          ? addDays(ovulationDate, avgLutealLength)
+          : addDays(lastPeriodDate, cycleLength)
+
+        const today = startOfDay(new Date())
+        const daysUntilNextPeriod = Math.round((nextPeriodDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+        setStats({
+          cycleLength,
+          currentDay,
+          lastPeriodDate,
+          nextPeriodDate,
+          ovulationDate,
+          fertileBands,
+          avgLutealLength,
+          daysUntilNextPeriod,
+          variabilityLabel: variability.label,
+          latePeriod: isLatePeriod(nextPeriodDate, today, cycleLengths),
+        })
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 400) {
           setError((err.response.data as { message?: string })?.message ?? 'Unable to load predictions.')
@@ -229,12 +199,23 @@ export default function PredictionsPage() {
     currentDay,
     lastPeriodDate,
     nextPeriodDate,
-    fertileStartDate,
-    fertileEndDate,
     ovulationDate,
-    confidenceDays,
+    fertileBands,
+    avgLutealLength,
     daysUntilNextPeriod,
+    variabilityLabel,
+    latePeriod,
   } = stats
+
+  const fertileDates = useMemo(() => {
+    return {
+      lowStart: addDays(lastPeriodDate, fertileBands.low[0] - 1),
+      lowEnd: addDays(lastPeriodDate, fertileBands.low[1] - 1),
+      mediumStart: addDays(lastPeriodDate, fertileBands.medium[0] - 1),
+      mediumEnd: addDays(lastPeriodDate, fertileBands.medium[1] - 1),
+      peak: addDays(lastPeriodDate, fertileBands.peak - 1),
+    }
+  }, [fertileBands, lastPeriodDate])
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
@@ -253,73 +234,77 @@ export default function PredictionsPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground pb-24">
-      {/* Header */}
       <header className="border-b border-border p-4 sticky top-0 bg-background/95 backdrop-blur-sm z-20">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-xl font-light text-foreground">Predictions</h1>
         </div>
       </header>
 
-      {/* Main content */}
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-        {loading && (
-          <p className="text-sm text-muted-foreground">Loading predictions...</p>
-        )}
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
+        {loading && <p className="text-sm text-muted-foreground">Loading predictions...</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {latePeriod && (
+          <section className="space-y-4">
+            <h2 className="text-base font-light text-foreground">Late period confidence</h2>
+            <div className="p-6 rounded-lg border border-border bg-card space-y-2">
+              <p className="text-sm text-foreground">
+                {latePeriod.daysLate} days late. {latePeriod.isUnusual ? 'This is unusual for you.' : "You've been this late before."}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Your cycles have ranged from {latePeriod.rangeMin} to {latePeriod.rangeMax} days.
+              </p>
+            </div>
+          </section>
         )}
 
-        {/* Next period section */}
         <section className="space-y-4">
           <h2 className="text-base font-light text-foreground">Next period</h2>
-          
+
           <div className="p-6 rounded-lg border border-border bg-card space-y-3">
-            <div className="flex items-baseline gap-2">
-              <div className="text-3xl font-light text-foreground">
-                {formatDate(nextPeriodDate)}
-              </div>
-            </div>
+            <div className="text-3xl font-light text-foreground">{formatDate(nextPeriodDate)}</div>
             <p className="text-sm text-muted-foreground">
-              Expected in{' '}
-              <span className="text-foreground font-medium">
-                {daysUntilNextPeriod} days
-              </span>
+              Expected in <span className="text-foreground font-medium">{daysUntilNextPeriod} days</span>
             </p>
+            <p className="text-xs text-muted-foreground">Cycle variability: {variabilityLabel}</p>
             <p className="text-xs text-muted-foreground">
-              ±{confidenceDays} days accuracy (based on your average cycle length of {cycleLength} days)
+              {avgLutealLength
+                ? `Your luteal phase is typically ${avgLutealLength} days`
+                : 'Log more cycles to estimate your luteal phase length'}
             </p>
           </div>
         </section>
 
-        {/* Fertile window section */}
         <section className="space-y-4">
-          <h2 className="text-base font-light text-foreground">Fertile window</h2>
+          <h2 className="text-base font-light text-foreground">Fertile window confidence</h2>
 
           <div className="p-4 rounded-lg border border-border bg-card space-y-3">
-            <div className="flex items-center gap-2">
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {formatDateShort(fertileStartDate)} – {formatDateShort(fertileEndDate)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Your most fertile days this cycle
-                </p>
-              </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Most likely fertile</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDateShort(fertileDates.mediumStart)} - {formatDateShort(fertileDates.mediumEnd)}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Possibly fertile</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDateShort(fertileDates.lowStart)} - {formatDateShort(fertileDates.lowEnd)}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Peak day</p>
+              <p className="text-xs text-muted-foreground">{formatDateShort(fertileDates.peak)}</p>
             </div>
           </div>
 
           <div className="p-4 rounded-lg border border-border bg-card space-y-2">
             <p className="text-sm font-medium text-foreground">Estimated ovulation</p>
-            <p className="text-xl font-light text-foreground">
-              {formatDate(ovulationDate)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              This is when an egg is released from your ovary
-            </p>
+            <p className="text-xl font-light text-foreground">{formatDate(ovulationDate)}</p>
           </div>
         </section>
 
-        {/* Cycle timeline */}
         <section className="space-y-4">
           <h2 className="text-base font-light text-foreground">Your cycle</h2>
           <CycleTimeline
@@ -328,17 +313,8 @@ export default function PredictionsPage() {
             lastPeriodDate={lastPeriodDate}
           />
         </section>
-
-        {/* Info box */}
-        <section className="p-4 rounded-lg border border-border bg-card space-y-2">
-          <p className="text-sm font-medium text-foreground">About predictions</p>
-          <p className="text-xs text-muted-foreground">
-            These predictions are based on your average cycle length. Every body is different—if your cycle is irregular, these predictions may vary. Track your data over time for more accurate predictions.
-          </p>
-        </section>
       </div>
 
-      {/* Navigation */}
       <Navigation active="predictions" />
     </main>
   )

@@ -24,6 +24,9 @@ public class User {
     @Column(nullable = false)
     private String passwordHash;
 
+    @Column(length = 64)
+    private String timezone;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -50,6 +53,14 @@ public class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 
     public Instant getCreatedAt() {

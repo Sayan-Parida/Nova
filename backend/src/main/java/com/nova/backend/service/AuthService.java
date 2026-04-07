@@ -33,6 +33,7 @@ public class AuthService {
         User user = new User();
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setTimezone(request.timezone() == null || request.timezone().isBlank() ? null : request.timezone().trim());
 
         User savedUser;
         try {
