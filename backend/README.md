@@ -39,7 +39,15 @@ For production:
 
 - Set `APP_CORS_ALLOWED_ORIGINS` to your deployed frontend domain(s), comma-separated.
 - Set `AUTH_REFRESH_COOKIE_SECURE=true` when serving HTTPS.
+- Set `AUTH_REFRESH_COOKIE_SAMESITE=None` if the frontend is hosted separately on Vercel.
 - Never commit `.env` files with real secrets.
+
+Recommended AWS setup:
+
+- Run the backend behind HTTPS on ECS, Elastic Beanstalk, App Runner, or EC2 with a load balancer.
+- Point `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USERNAME`/`DB_PASSWORD` at your managed MySQL instance.
+- Set `APP_CORS_ALLOWED_ORIGINS` to the exact Vercel URL, not `*`.
+- Use `AUTH_REFRESH_COOKIE_SECURE=true` and `AUTH_REFRESH_COOKIE_SAMESITE=None` for browser refresh cookies.
 
 ### 2. Start MySQL + app using Docker Compose
 

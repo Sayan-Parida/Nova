@@ -23,7 +23,24 @@ Nova is a full-stack, privacy-first menstrual health tracker with:
 3. For production:
 	- Set `APP_CORS_ALLOWED_ORIGINS` to your frontend URL(s)
 	- Set `AUTH_REFRESH_COOKIE_SECURE=true`
+	- Set `AUTH_REFRESH_COOKIE_SAMESITE=None` when the frontend is on Vercel and the backend is on AWS
 	- Set `NEXT_PUBLIC_API_BASE_URL` to your deployed backend URL
+
+## Suggested Deployment Split
+
+Frontend on Vercel:
+
+- `NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain`
+
+Backend on AWS:
+
+- `APP_CORS_ALLOWED_ORIGINS=https://your-frontend-domain`
+- `AUTH_REFRESH_COOKIE_SECURE=true`
+- `AUTH_REFRESH_COOKIE_SAMESITE=None`
+- `JWT_SECRET` set to a strong production secret
+- Database connection variables point at your managed MySQL instance
+
+The frontend already sends requests with credentials enabled, so once the cookie settings above are in place, refresh and logout will work across the two hosts.
 
 ## Local Development
 
