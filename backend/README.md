@@ -1,6 +1,6 @@
 # Nova Backend (Privacy-First Menstrual Health Tracker)
 
-Spring Boot 3 backend for Nova using Java 21, Maven, MySQL, JWT authentication, and encrypted blob storage.
+Spring Boot 3 backend for Nova using Java 17, Maven, MySQL, JWT authentication, and encrypted blob storage.
 
 ## Privacy Model
 
@@ -10,7 +10,7 @@ Spring Boot 3 backend for Nova using Java 21, Maven, MySQL, JWT authentication, 
 
 ## Tech Stack
 
-- Java 21
+- Java 17
 - Spring Boot 3
 - Spring Security (JWT)
 - Spring Data JPA
@@ -22,6 +22,7 @@ Spring Boot 3 backend for Nova using Java 21, Maven, MySQL, JWT authentication, 
 ### 1. Environment variables
 
 ```bash
+SERVER_PORT=8081
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=nova
@@ -29,7 +30,16 @@ DB_USERNAME=nova
 DB_PASSWORD=nova_pass
 JWT_SECRET=replace-with-at-least-32-char-secret
 JWT_EXPIRATION_MS=86400000
+JWT_REFRESH_EXPIRATION_MS=604800000
+APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
+AUTH_REFRESH_COOKIE_SECURE=false
 ```
+
+For production:
+
+- Set `APP_CORS_ALLOWED_ORIGINS` to your deployed frontend domain(s), comma-separated.
+- Set `AUTH_REFRESH_COOKIE_SECURE=true` when serving HTTPS.
+- Never commit `.env` files with real secrets.
 
 ### 2. Start MySQL + app using Docker Compose
 
@@ -49,7 +59,7 @@ From the `backend` folder:
 
 ## REST API
 
-Base URL: `http://localhost:8080`
+Base URL: `http://localhost:8081`
 
 ### Health
 
@@ -151,9 +161,19 @@ Response (200):
 ]
 ```
 
-#### DELETE /api/cycles/{id}
+#### DELETE /api/cycles/entry/{id}
 
 Response (204): no content
+
+#### DELETE /api/cycles/{userId}
+
+Response (200):
+
+```json
+{
+  "deleted": 42
+}
+```
 
 ### Prediction (ONNX)
 

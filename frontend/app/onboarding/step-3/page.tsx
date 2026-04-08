@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { OnboardingLayout } from '@/components/onboarding-layout'
 import { clearOnboardingDraft } from '@/src/lib/onboarding-state'
+import api from '@/src/lib/api'
 import { useAuth } from '@/context/AuthContext'
 
 export default function OnboardingStep3() {
@@ -19,7 +20,6 @@ export default function OnboardingStep3() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
   const handleComplete = async () => {
-    console.log('registering...')
     const newErrors: { [key: string]: string } = {}
 
     if (!email.trim()) {
@@ -49,13 +49,13 @@ export default function OnboardingStep3() {
         ? Intl.DateTimeFormat().resolvedOptions().timeZone
         : null
 
-      const response = await axios.post('http://localhost:8081/api/auth/register', {
+      const response = await api.post('/api/auth/register', {
         email: email.trim().toLowerCase(),
         password,
         timezone,
       })
 
-      setAuthSession(response.data.token, password)
+      setAuthSession(response.data.accessToken ?? response.data.token, password)
       clearOnboardingDraft()
       router.replace('/dashboard')
     } catch (err) {
@@ -98,7 +98,7 @@ export default function OnboardingStep3() {
         {/* Info box */}
         <div className="p-4 rounded-lg bg-card border border-border">
           <p className="text-sm text-foreground">
-            <span className="font-medium">Privacy notice:</span> Your password encrypts your data. We never store it on our servers. Data remains on your device.
+            <span className="font-medium">Privacy notice:</span> Your data is encrypted on your device before being stored — we can never read it.
           </p>
         </div>
 

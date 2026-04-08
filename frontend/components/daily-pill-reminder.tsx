@@ -95,7 +95,7 @@ export function DailyPillReminder() {
 
     const loadReminderProfile = async () => {
       try {
-        const response = await api.get(`/api/cycles/${userId}`)
+        const response = await api.get(`/api/cycles/${userId}?page=0&size=365`)
         const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
         const latestProfileLog = logs
           .filter((log) => log.dataType === 'PROFILE')

@@ -1,7 +1,7 @@
 'use client'
 
 import axios from 'axios'
-import { clearAuthSession, getAuthToken } from '@/context/AuthContext'
+import { clearAuthSession, getAuthPassword, getAuthToken, setAuthSession } from '@/context/AuthContext'
 
 function getTimezoneOffsetHeaderValue() {
   const offsetMinutes = -new Date().getTimezoneOffset()
@@ -13,7 +13,8 @@ function getTimezoneOffsetHeaderValue() {
 }
 
 const api = axios.create({
-  baseURL: 'http://localhost:8081',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081',
+  withCredentials: true,
 })
 
 api.interceptors.request.use(
@@ -34,7 +35,7 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (!error.response) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('nova-network-error'))
@@ -42,7 +43,25 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    if (error.response.status === 401) {
+    const originalRequest = error.config ?? {}
+
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+
+      try {
+        const refreshResponse = await api.post('/api/auth/refresh')
+        const refreshedToken = refreshResponse?.data?.accessToken ?? refreshResponse?.data?.token
+
+        if (refreshedToken) {
+          setAuthSession(refreshedToken, getAuthPassword())
+          originalRequest.headers = originalRequest.headers ?? {}
+          originalRequest.headers.Authorization = `Bearer ${refreshedToken}`
+          return api(originalRequest)
+        }
+      } catch {
+        // Fall through to session clear when refresh fails.
+      }
+
       clearAuthSession()
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login'

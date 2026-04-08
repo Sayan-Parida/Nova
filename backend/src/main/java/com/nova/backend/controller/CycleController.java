@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -54,15 +56,27 @@ public class CycleController {
     }
 
     @GetMapping("/{userId}")
-    public List<CycleLogResponse> getCycleLogs(@PathVariable UUID userId, Authentication authentication) {
+    public List<CycleLogResponse> getCycleLogs(
+            @PathVariable UUID userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication
+    ) {
         AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
-        return cycleService.getLogsByUser(userId, principal.userId());
+        return cycleService.getLogsByUser(userId, principal.userId(), page, size);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/entry/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCycleLog(@PathVariable UUID id, Authentication authentication) {
         AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
         cycleService.deleteLog(id, principal.userId());
+    }
+
+    @DeleteMapping("/{userId}")
+    public Map<String, Long> deleteAllCycleLogs(@PathVariable UUID userId, Authentication authentication) {
+        AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
+        long deleted = cycleService.deleteAllLogsByUser(userId, principal.userId());
+        return Map.of("deleted", deleted);
     }
 }

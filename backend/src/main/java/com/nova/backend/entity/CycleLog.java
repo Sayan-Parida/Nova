@@ -12,13 +12,22 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Index;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cycle_logs")
+@Table(
+    name = "cycle_logs",
+    uniqueConstraints = @UniqueConstraint(name = "uk_cycle_logs_user_day", columnNames = {"user_id", "log_date"}),
+    indexes = {
+        @Index(name = "idx_cycle_logs_user_id", columnList = "user_id"),
+        @Index(name = "idx_cycle_logs_log_date", columnList = "log_date")
+    }
+)
 public class CycleLog {
 
     @Id

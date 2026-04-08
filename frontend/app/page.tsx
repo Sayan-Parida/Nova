@@ -13,12 +13,12 @@ export default function LandingPage() {
               Nova
             </h1>
             <p className="text-base md:text-lg text-muted-foreground font-light">
-              Private cycle tracking with encrypted records.
+              Private cycle tracking with local privacy controls.
             </p>
           </div>
 
           <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Data is encrypted with your password. No advertising and no data sharing.
+            Your data is encrypted on your device before being stored — we can never read it.
           </p>
 
           <div className="pt-6">
@@ -39,7 +39,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-xs text-muted-foreground pt-8">
-            All data stays on your device. We never collect or store any information.
+            Your data is encrypted on your device before being stored — we can never read it.
           </p>
         </div>
       </div>

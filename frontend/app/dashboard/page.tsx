@@ -147,7 +147,7 @@ export default function DashboardPage() {
         return
       }
 
-      const response = await api.get(`/api/cycles/${userId}`)
+      const response = await api.get(`/api/cycles/${userId}?page=0&size=365`)
       const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
 
       const decryptedLogs = await Promise.all(

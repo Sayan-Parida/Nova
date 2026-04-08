@@ -60,6 +60,10 @@ public class JwtUtil {
         return extractClaims(token).getSubject();
     }
 
+    public long getExpirationMs() {
+        return expirationMs;
+    }
+
     private byte[] sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

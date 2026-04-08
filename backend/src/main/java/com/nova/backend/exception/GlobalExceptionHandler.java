@@ -35,6 +35,11 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.FORBIDDEN, "Forbidden");
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<Map<String, Object>> handleTooManyRequests(TooManyRequestsException ex) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, Object> body = baseBody(HttpStatus.BAD_REQUEST, "Validation failed");

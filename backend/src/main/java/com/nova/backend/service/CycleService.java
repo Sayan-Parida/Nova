@@ -10,9 +10,11 @@ import com.nova.backend.exception.ResourceNotFoundException;
 import com.nova.backend.exception.UnauthorizedException;
 import com.nova.backend.repository.CycleLogRepository;
 import com.nova.backend.repository.UserRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -88,12 +90,15 @@ public class CycleService {
         return toResponse(cycleLogRepository.save(existing));
     }
 
-    public List<CycleLogResponse> getLogsByUser(UUID requestedUserId, UUID authenticatedUserId) {
+    public List<CycleLogResponse> getLogsByUser(UUID requestedUserId, UUID authenticatedUserId, int page, int size) {
         if (!requestedUserId.equals(authenticatedUserId)) {
             throw new UnauthorizedException("You can only access your own encrypted logs.");
         }
 
-        return cycleLogRepository.findByUserIdOrderByTimestampDesc(requestedUserId)
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(1, Math.min(size, 100));
+
+        return cycleLogRepository.findByUserIdOrderByTimestampDesc(requestedUserId, PageRequest.of(safePage, safeSize))
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -103,6 +108,14 @@ public class CycleService {
         CycleLog log = cycleLogRepository.findByIdAndUserId(logId, authenticatedUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cycle log not found."));
         cycleLogRepository.delete(log);
+    }
+
+    public long deleteAllLogsByUser(UUID requestedUserId, UUID authenticatedUserId) {
+        if (!requestedUserId.equals(authenticatedUserId)) {
+            throw new UnauthorizedException("You can only delete your own encrypted logs.");
+        }
+
+        return cycleLogRepository.deleteByUserId(requestedUserId);
     }
 
     private CycleLogResponse toResponse(CycleLog cycleLog) {
@@ -153,8 +166,15 @@ public class CycleService {
 
     private LocalDate parseDate(String value) {
         try {
-            return LocalDate.parse(value);
+            LocalDate parsed = LocalDate.parse(value);
+            if (parsed.isAfter(LocalDate.now(ZoneOffset.UTC))) {
+                throw new BadRequestException("logDate cannot be in the future.");
+            }
+            return parsed;
         } catch (Exception ex) {
+            if (ex instanceof BadRequestException badRequestException) {
+                throw badRequestException;
+            }
             throw new BadRequestException("logDate must be a valid ISO date (YYYY-MM-DD).");
         }
     }

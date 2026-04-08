@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/context/AuthContext'
+import { AppErrorBoundary } from '@/components/app-error-boundary'
 import { Toaster } from '@/components/ui/sonner'
 import { NetworkErrorListener } from '@/components/network-error-listener'
 import { DailyPillReminder } from '@/components/daily-pill-reminder'
@@ -32,13 +33,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <AuthProvider>
-          {children}
-          <NetworkErrorListener />
-          <DailyPillReminder />
-          <Toaster />
-          <Analytics />
-        </AuthProvider>
+        <AppErrorBoundary>
+          <AuthProvider>
+            {children}
+            <NetworkErrorListener />
+            <DailyPillReminder />
+            <Toaster />
+            <Analytics />
+          </AuthProvider>
+        </AppErrorBoundary>
       </body>
     </html>
   )

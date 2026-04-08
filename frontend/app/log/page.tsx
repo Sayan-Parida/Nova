@@ -86,7 +86,7 @@ export default function LogPage() {
       }
 
       try {
-        const response = await api.get(`/api/cycles/${userId}`)
+        const response = await api.get(`/api/cycles/${userId}?page=0&size=365`)
         const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
         const { decryptCyclePayload } = await import('@/src/lib/crypto')
 
@@ -170,7 +170,7 @@ export default function LogPage() {
     const todayDate = parseDateInput(todayPayload.selectedDate) ?? new Date()
 
     try {
-      const response = await api.get(`/api/cycles/${userId}`)
+      const response = await api.get(`/api/cycles/${userId}?page=0&size=365`)
       const logs = (Array.isArray(response.data) ? response.data : []) as CycleLogItem[]
       const { decryptCyclePayload } = await import('@/src/lib/crypto')
 
