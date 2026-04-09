@@ -18,6 +18,8 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+      - name: Clear Maven cache
+        run: rm -rf ~/.m2/repository/com/nova
       - name: Run Maven tests
         run: |
           chmod +x mvnw
