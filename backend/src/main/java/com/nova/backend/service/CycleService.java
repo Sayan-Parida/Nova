@@ -14,7 +14,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -139,15 +138,15 @@ public class CycleService {
 
     private LocalDate resolveAndValidateLogDate(CycleLogRequest request, String timezoneOffsetHeader) {
         if (request.dataType() != DataType.CYCLE) {
-            return parseOptionalLogDate(request.logDate());
+            return parseOptionalLogDate(request.logDate(), timezoneOffsetHeader);
         }
 
         if (request.logDate() == null || request.logDate().isBlank()) {
             throw new BadRequestException("logDate is required for cycle logs.");
         }
 
-        LocalDate requestDate = parseDate(request.logDate());
         LocalDate resolvedToday = timezoneResolverService.resolveToday(timezoneOffsetHeader);
+        LocalDate requestDate = parseDate(request.logDate(), resolvedToday);
 
         if (!requestDate.equals(resolvedToday)) {
             throw new BadRequestException("Cycle logs are only allowed for today's date in your local timezone.");
@@ -156,18 +155,18 @@ public class CycleService {
         return requestDate;
     }
 
-    private LocalDate parseOptionalLogDate(String value) {
+    private LocalDate parseOptionalLogDate(String value, String timezoneOffsetHeader) {
         if (value == null || value.isBlank()) {
             return null;
         }
 
-        return parseDate(value);
+        return parseDate(value, timezoneResolverService.resolveToday(timezoneOffsetHeader));
     }
 
-    private LocalDate parseDate(String value) {
+    private LocalDate parseDate(String value, LocalDate maxAllowedDate) {
         try {
             LocalDate parsed = LocalDate.parse(value);
-            if (parsed.isAfter(LocalDate.now(ZoneOffset.UTC))) {
+            if (parsed.isAfter(maxAllowedDate)) {
                 throw new BadRequestException("logDate cannot be in the future.");
             }
             return parsed;
