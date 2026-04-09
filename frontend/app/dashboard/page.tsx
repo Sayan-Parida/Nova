@@ -402,7 +402,7 @@ export default function DashboardPage() {
       const requestBody = {
         encryptedData,
         dataType: 'CYCLE',
-        logDate: todayKey,
+        logDate: new Date().toISOString().split('T')[0],
       }
 
       if (todayEntry) {
