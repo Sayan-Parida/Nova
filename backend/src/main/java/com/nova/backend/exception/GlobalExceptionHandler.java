@@ -23,10 +23,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(BadRequestException ex) {
-        if (isDuplicateRegistration(ex.getMessage())) {
-            return buildError(HttpStatus.CONFLICT, ex.getMessage());
-        }
         return buildError(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {
+        return buildError(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -91,11 +93,4 @@ public class GlobalExceptionHandler {
         return body;
     }
 
-    private boolean isDuplicateRegistration(String message) {
-        if (message == null) {
-            return false;
-        }
-        String normalized = message.toLowerCase();
-        return normalized.contains("already registered") || normalized.contains("already exists") || normalized.contains("duplicate");
-    }
 }

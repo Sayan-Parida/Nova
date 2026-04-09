@@ -5,6 +5,7 @@ import com.nova.backend.dto.RegisterRequest;
 import com.nova.backend.entity.RefreshToken;
 import com.nova.backend.entity.User;
 import com.nova.backend.exception.BadRequestException;
+import com.nova.backend.exception.ConflictException;
 import com.nova.backend.exception.UnauthorizedException;
 import com.nova.backend.repository.RefreshTokenRepository;
 import com.nova.backend.repository.UserRepository;
@@ -50,7 +51,7 @@ public class AuthService {
     public TokenPair register(RegisterRequest request) {
         String normalizedEmail = request.email().trim().toLowerCase();
         if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new BadRequestException("Email already registered.");
+            throw new ConflictException("Email already registered.");
         }
 
         User user = new User();
@@ -62,7 +63,7 @@ public class AuthService {
         try {
             savedUser = userRepository.save(user);
         } catch (DataIntegrityViolationException ex) {
-            throw new BadRequestException("Email already registered.");
+            throw new ConflictException("Email already registered.");
         }
 
         return issueTokenPair(savedUser);
