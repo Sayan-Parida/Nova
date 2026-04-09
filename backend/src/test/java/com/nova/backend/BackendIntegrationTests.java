@@ -114,7 +114,7 @@ class BackendIntegrationTests {
                                   "timezone": "UTC"
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Email already registered."));
     }
 
