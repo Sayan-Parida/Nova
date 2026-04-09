@@ -25,16 +25,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final boolean refreshCookieSecure;
-    private final String refreshCookieSameSite;
 
     public AuthController(
             AuthService authService,
-            @Value("${app.auth.refresh-cookie-secure:false}") boolean refreshCookieSecure,
-            @Value("${app.auth.refresh-cookie-samesite:Lax}") String refreshCookieSameSite
+            @Value("${APP_SECURE_COOKIE:false}") boolean refreshCookieSecure
     ) {
         this.authService = authService;
         this.refreshCookieSecure = refreshCookieSecure;
-        this.refreshCookieSameSite = refreshCookieSameSite;
     }
 
     @PostMapping("/register")
@@ -68,7 +65,7 @@ public class AuthController {
         ResponseCookie clearCookie = ResponseCookie.from("refresh_token", "")
                 .httpOnly(true)
                 .secure(refreshCookieSecure)
-            .sameSite(refreshCookieSameSite)
+                .sameSite("Lax")
                 .path("/api/auth")
                 .maxAge(0)
                 .build();
@@ -82,7 +79,7 @@ public class AuthController {
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", tokenPair.refreshToken())
                 .httpOnly(true)
                 .secure(refreshCookieSecure)
-            .sameSite(refreshCookieSameSite)
+                .sameSite("Lax")
                 .path("/api/auth")
                 .maxAge(60L * 60L * 24L * 7L)
                 .build();
