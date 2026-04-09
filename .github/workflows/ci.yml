@@ -28,7 +28,8 @@ jobs:
         working-directory: .
 
       - name: Run Maven tests
-        run: ./mvnw -B test
+        run: mvn -B test
+        working-directory: backend
 
   frontend-build:
     name: Frontend Build
