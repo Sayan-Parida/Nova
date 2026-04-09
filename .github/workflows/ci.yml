@@ -23,6 +23,10 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Make mvnw executable
+        run: chmod +x backend/mvnw
+        working-directory: .
+
       - name: Run Maven tests
         run: ./mvnw -B test
 
