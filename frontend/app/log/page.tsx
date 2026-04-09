@@ -280,7 +280,7 @@ export default function LogPage() {
       const requestBody = {
         encryptedData,
         dataType: 'CYCLE',
-        logDate: new Date().toISOString().split('T')[0],
+        logDate: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
       }
 
       if (existingLogId) {
