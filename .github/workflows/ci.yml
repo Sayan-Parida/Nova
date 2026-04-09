@@ -9,26 +9,19 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: maven
-
-      - name: Make mvnw executable
-        run: chmod +x backend/mvnw
-        working-directory: .
-
       - name: Run Maven tests
-        run: mvn -B test
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
         working-directory: backend
 
   frontend-build:
